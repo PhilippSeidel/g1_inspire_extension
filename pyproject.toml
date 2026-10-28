@@ -1,0 +1,17 @@
+[project]
+name = "g1_inspire_extension"
+version = "0.0.1"
+description = "INCAR extension for the Unitree G1 with an Inspire hand: arm and hand teleoperation in one robot interface"
+authors = [
+    { name = "Philipp Seidel", email = "psei@kth.se" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "incar_networking",
+    "unitree_g1_extension",
+    "inspire_extension"
+]
+
+[tool.setuptools]
+packages = ["g1_inspire_extension", "g1_inspire_extension.robot_interface"]
