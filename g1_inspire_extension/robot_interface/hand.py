@@ -30,7 +30,7 @@ class InspireGripper:
         print(f"InspireGripper {self.module_name} initialized, hand_id={self.hand_id}")
         
         self._process = ctx.Process(
-            target=self.hand_id,
+            target=self.hand_process,
             args=(port, self._enabled, self._closed, self._has_state, self._angles, self._forces),
             daemon=True,
         )
