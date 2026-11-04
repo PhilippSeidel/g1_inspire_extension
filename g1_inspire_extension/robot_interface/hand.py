@@ -4,8 +4,6 @@ import traceback
 from incar_networking.robot_interface import IncarRobotInterface
 from inspire_extension.robot_interface.inspire_interface import openSerial, readRegister, regdict, write6
 
-HAND_ID = 1
-
 OPEN_POSE = [1000, 1000, 1000, 1000, 1000, 1000]
 CLOSED_POSE = [0, 0, 0, 0, 400, 1000]  # thumb not fully bent, so it stays clear of the closed fingers
 
@@ -23,8 +21,16 @@ class InspireGripper:
         self._has_state = ctx.Value("b", False)
         self._angles = ctx.Array("i", 6)
         self._forces = ctx.Array("i", 6)
+        
+        self.hand_id = 1
+        if self.module_name == "right_hand":
+            self.hand_id = 2
+        elif self.module_name != "left_hand":
+            print(f"Warning: unknown hand module name {self.module_name}, using hand_id={self.hand_id}")
+        print(f"InspireGripper {self.module_name} initialized, hand_id={self.hand_id}")
+        
         self._process = ctx.Process(
-            target=_hand_process,
+            target=self.hand_id,
             args=(port, self._enabled, self._closed, self._has_state, self._angles, self._forces),
             daemon=True,
         )
@@ -46,39 +52,39 @@ class InspireGripper:
         interface.set_robot_state(self.module_name, joint_pos=list(self._angles), joint_effort=list(self._forces))
 
 
-def _hand_process(port, enabled, closed, has_state, angles, forces):
-    try:
-        enabled.wait()
-        ser = openSerial(port, 115200)
-        write6(ser, HAND_ID, "speedSet", [1000] * 6)
-        write6(ser, HAND_ID, "forceSet", [1000] * 6)
-        write6(ser, HAND_ID, "angleSet", OPEN_POSE)
-        is_closed = False
-        print("Inspire hand initialised, fingers opening")
-        while True:
-            if bool(closed.value) != is_closed:
-                is_closed = bool(closed.value)
-                write6(ser, HAND_ID, "angleSet", CLOSED_POSE if is_closed else OPEN_POSE)
-            current_angles = _read6(ser, "angleAct")
-            current_forces = _read6(ser, "forceAct")
-            if current_angles is not None and current_forces is not None:
-                angles[:] = current_angles
-                forces[:] = current_forces
-                has_state.value = True
-    except KeyboardInterrupt:
-        pass
-    except Exception:
-        print("Inspire hand process stopped:")
-        traceback.print_exc()
+    def hand_process(self, port, enabled, closed, has_state, angles, forces):
+        try:
+            enabled.wait()
+            ser = openSerial(port, 115200)
+            write6(ser, self.hand_id, "speedSet", [1000] * 6)
+            write6(ser, self.hand_id, "forceSet", [1000] * 6)
+            write6(ser, self.hand_id, "angleSet", OPEN_POSE)
+            is_closed = False
+            print("Inspire hand initialised, fingers opening")
+            while True:
+                if bool(closed.value) != is_closed:
+                    is_closed = bool(closed.value)
+                    write6(ser, self.hand_id, "angleSet", CLOSED_POSE if is_closed else OPEN_POSE)
+                current_angles = self.read6(ser, "angleAct")
+                current_forces = self.read6(ser, "forceAct")
+                if current_angles is not None and current_forces is not None:
+                    angles[:] = current_angles
+                    forces[:] = current_forces
+                    has_state.value = True
+        except KeyboardInterrupt:
+            pass
+        except Exception:
+            print("Inspire hand process stopped:")
+            traceback.print_exc()
 
 
-def _read6(ser, key):
-    """read6 without its console print on every read; None if the reply is missing or incomplete."""
-    try:
-        raw = readRegister(ser, HAND_ID, regdict[key], 12, mute=True)
-    except IndexError:  
-        return None
-    if len(raw) < 12:
-        return None
-    values = [raw[2 * i] | (raw[2 * i + 1] << 8) for i in range(6)]
-    return [v - 65536 if v > 32767 else v for v in values]
+    def read6(self, ser, key):
+        """read6 without its console print on every read; None if the reply is missing or incomplete."""
+        try:
+            raw = readRegister(ser, self.hand_id, regdict[key], 12, mute=True)
+        except IndexError:  
+            return None
+        if len(raw) < 12:
+            return None
+        values = [raw[2 * i] | (raw[2 * i + 1] << 8) for i in range(6)]
+        return [v - 65536 if v > 32767 else v for v in values]
