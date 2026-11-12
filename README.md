@@ -22,6 +22,8 @@ python -m g1_inspire_extension.robot_interface.run --robot real
 | `--arm` | `right`, `left` | `right` | Arm to teleoperate |
 | `--no-viewer` | flag | off | Simulation only: don't open the MuJoCo window, publish the sim cameras over ZMQ instead |
 | `--hand-port` | path | `/dev/ttyUSB0` | Serial port of the Inspire hand |
+| `--hand-mode` | `gripper`, `hand` | `gripper` | Inspire hand as open/close gripper or full 6-joint hand |
+| `--walk` | flag | off | Walk with LeRobot's GR00T locomotion policy, driven by `base.commands.tank`. Real robot: feet on the floor, in a harness |
 
 If the hand can't be opened (e.g. no hand plugged in when testing in simulation), the hand process prints the error and stops; the arm keeps working.
 
@@ -29,6 +31,7 @@ If the hand can't be opened (e.g. no hand plugged in when testing in simulation)
 
 - **Arm**: unchanged from `unitree_g1_extension`, driven by `right.commands.arm.ee.velocity`.
 - **Hand**: driven by `right.commands.gripper.openclose`, the analog trigger of the right controller (0 released, 1 pressed). The hand fully closes when the trigger passes 0.75 and fully opens when it drops below 0.25. It only receives the command while the right side is engaged and holds its pose otherwise. It opens once the G1 is connected.
+- **Walking** (`--walk`): LeRobot's GR00T controller drives legs and waist at 50 Hz on the INCAR PC; `run_g1_server.py` on the robot is unchanged. `base.commands.tank` `[vx, vy, wz]` (right stick y, right stick x, left stick x) is passed as the remote axes `ly`, `lx`, `rx`, clipped to ±1: stick forward walks forward, right stick right steps right, left stick right turns right. Below a command norm of 0.05 the balance policy stands still. If no tank command arrives for 0.2 s, the command is zeroed. Limit the speed with the `limit_base` step in the workspace config (e.g. 0.2). On exit the robot goes limp. In simulation the robot hangs on an elastic band: press `9` in the MuJoCo window to release it (so `--walk` needs the viewer).
 - The serial I/O of the hand runs in a separate process, so it doesn't stall the 10 ms control loop.
 - The state is published every 10 ms: the arm as `right_arm` / `left_arm` (see `unitree_g1_extension`), the hand as `right_hand` / `left_hand` with the raw `angleAct` (0 closed – 1000 open) as `joint_pos` and `forceAct` as `joint_effort`.
 

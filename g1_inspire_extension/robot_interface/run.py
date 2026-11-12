@@ -41,14 +41,19 @@ if __name__ == "__main__":
         default="gripper",
         help="use inspire hand as gripper (binary input) or as full hand (6 joint angles)",
     )
+    parser.add_argument(
+        "--walk",
+        action="store_true",
+        help="walk with LeRobot's GR00T locomotion policy, driven by base.commands.tank (real robot: feet on the floor)",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
-    
+
     if args.robot == "real":
-        robot = G1RobotReal(arm=args.arm)
+        robot = G1RobotReal(arm=args.arm, walk=args.walk)
     else:
-        robot = G1RobotSim(arm=args.arm, viewer=not args.no_viewer)
-        
+        robot = G1RobotSim(arm=args.arm, viewer=not args.no_viewer, walk=args.walk)
+
     robot.connect()
     bridge = IncarG1Bridge(robot)
     
@@ -74,6 +79,9 @@ if __name__ == "__main__":
                         gripper.on_loop,  
                         bridge.on_loop
                     ]
+
+    if args.walk:
+        command_hooks["base.commands.tank"] = bridge.on_base_tank
 
     interface = IncarRobotInterface(
             0.01,
